@@ -1,8 +1,8 @@
 # silentbobwatches 
 
-A defensive-security assessment tool for discovering, fingerprinting, and
+A defensiveish-security assessment tool for discovering, fingerprinting, and
 evidence-scoring Intel AMT / ISM management interfaces on networks you are
-authorized to assess. Discovery is passive by default; vulnerability
+authorized to assess. As the name implies it was mainly built around CVE-2017-5689 as I discovered the only real software to scan a target was a half baked MSF module. Discovery is passive by default; vulnerability
 confirmation is opt-in, read-only, and consent-gated.
 
 Built for speed (async, concurrent, single static binary) and for honesty about
