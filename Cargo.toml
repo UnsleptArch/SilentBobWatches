@@ -1,0 +1,36 @@
+[package]
+name = "silentbobwatches"
+version = "2.0.0"
+edition = "2021"
+description = "Professional defensive security assessment framework for Intel AMT discovery, fingerprinting, and evidence-based vulnerability visibility."
+authors = ["archtix"]
+license = "GPL-3.0-or-later"
+
+[[bin]]
+name = "silentbobwatches"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "macros", "io-util", "fs"] }
+futures = "0.3"
+clap = { version = "=4.4.18", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde", "clock"], default-features = false }
+indicatif = "0.17"
+ipnet = "2"
+colored = "2"
+anyhow = "1"
+md-5 = "0.10"
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "tls12", "std"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["logging", "tls12", "ring"] }
+rustls-pki-types = "1"
+x509-parser = "0.16"
+time = "=0.3.36"
+zeroize = "=1.7.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

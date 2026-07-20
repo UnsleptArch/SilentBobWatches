@@ -1,0 +1,4 @@
+/target
+SilentBobWatchesLogs/
+Cargo.lock.bak
+*.pdb
