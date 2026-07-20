@@ -62,6 +62,8 @@ The active checks authenticate to a device, so they run only behind an explicit
 > not yet been validated against live AMT hardware. Confirm behavior on a device
 > you own before relying on active verdicts.
 
+BASICALLYYYY that all amounts to don't get me in trouble please + claude safety slop,
+
 ## Building
 
 Requires a stable Rust toolchain (edition 2021).
@@ -145,4 +147,4 @@ For assessing systems you own or are explicitly authorized to test. Active
 checks authenticate to a device — only point them at hosts you are authorized to
 assess. Scanning or authenticating without authorization may be illegal
 regardless of what the tool does; that responsibilty sits with the operator, not
-the tool.
+the tool. Don't come crying to me when you get into trouble for using this. 
