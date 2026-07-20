@@ -1,4 +1,4 @@
-# silentbobwatches (v2.0, Rust)
+# silentbobwatches 
 
 A defensive-security assessment tool for discovering, fingerprinting, and
 evidence-scoring Intel AMT / ISM management interfaces on networks you are
