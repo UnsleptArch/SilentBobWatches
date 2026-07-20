@@ -97,8 +97,16 @@ setup.
   Server header, or page title, and extracts the device GUID from the realm.
   It does **not** infer a firmware version; AMT does not expose the build
   unauthenticated, so any scraped version would be noise.
-- `presence_finding`, `unauthenticated_exposure_check` (a 200 to an
-  unauthenticated GET), `tls_findings`, `rmcp_findings`, `redirection_finding`.
+- `presence_finding`, `provisioning_posture`, `unauthenticated_exposure_check`
+  (a 200 to an unauthenticated GET), `tls_findings`, `rmcp_findings`,
+  `redirection_finding`.
+- `provisioning_posture` — answers the questions that hold regardless of patch
+  level: is the management plane reachable here, is it provisioned/operational
+  (a live interface means AMT is provisioned, not dormant), and does it enforce
+  authentication. It populates `provisioning_state_hint` and emits a `Medium`
+  finding. The exact control mode (CCM vs ACM) is *not* readable unauthenticated,
+  so it is recorded as an open item and not guessed — same honesty rule as the
+  version handling.
 - `cve_reference` — with no authenticated version, emits one honest
   `Insufficient` finding listing the applicable advisories and how to confirm
   them, rather than one speculative finding per CVE.
@@ -179,3 +187,23 @@ version). `Fixed`/`NotApplicable` are silent — nothing actionable to report.
 
 No exploitation logic is added for new advisories — confirmation is always by
 authenticated version comparison.
+
+---
+
+## Tests
+
+The pure, side-effect-free logic is covered by inline `#[cfg(test)]` modules
+(run with `cargo test`). These are the functions where a silent regression would
+produce a *wrong verdict*, so they are the parts worth pinning down:
+
+| Module | What is tested |
+|---|---|
+| `cve_db.rs` | `parse_firmware_hint`, `evaluate_generic` (below/at/above threshold, unlisted branch), and the `evaluate_2017_5689` special case (leading-3 build = fixed, in-scope vs out-of-scope branches). |
+| `active.rs` | `dechunk`, `field` / `parse_challenge`, `amt_version_segments` / `pick_amt_version`, `parse_response`, and that the bypass Digest header carries an *empty* response hash while a credentialed one does not. |
+| `cli.rs` | `expand_ports` (parsing, trimming, rejection) and `expand_targets` (single, list, comment/blank skipping, dash-range, CIDR host expansion). |
+| `scanner.rs` | `extract_between`, `hex_encode`, the `ASF_PRESENCE_PING` byte layout, and `parse_http_response` (status, Digest realm/nonce, page title, server header). |
+
+The network I/O and the active device-touching paths are deliberately not
+covered here — theres no substitute for validating those against real hardware
+(see the verification-status note above). The tests lock down the deterministic
+logic around them so a refactor cant quietly change a verdict.

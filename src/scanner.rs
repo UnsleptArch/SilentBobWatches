@@ -538,6 +538,47 @@ fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_between_finds_delimited_text() {
+        assert_eq!(
+            extract_between("<title>Hello</title>", "<title>", "</title>").as_deref(),
+            Some("Hello")
+        );
+        assert!(extract_between("no markers here", "<title>", "</title>").is_none());
+    }
+
+    #[test]
+    fn hex_encode_is_lowercase_two_digit() {
+        assert_eq!(hex_encode(&[0x06, 0x00, 0xff, 0xbe]), "0600ffbe");
+    }
+
+    #[test]
+    fn asf_presence_ping_is_well_formed() {
+        assert_eq!(ASF_PRESENCE_PING.len(), 12);
+        assert_eq!(ASF_PRESENCE_PING[3], 0x06); // RMCP class = ASF
+        assert_eq!(ASF_PRESENCE_PING[8], 0x80); // message type = Presence Ping
+    }
+
+    #[test]
+    fn parse_http_response_pulls_status_headers_realm_title() {
+        let raw = b"HTTP/1.1 401 Unauthorized\r\n\
+Server: Intel(R) Active Management Technology\r\n\
+WWW-Authenticate: Digest realm=\"Digest:ABCDEF\", nonce=\"n1\"\r\n\
+\r\n\
+<html><title>Intel AMT</title></html>";
+        let parsed = parse_http_response(raw, 12);
+        assert_eq!(parsed.info.status_code, Some(401));
+        assert_eq!(parsed.info.digest_realm.as_deref(), Some("Digest:ABCDEF"));
+        assert_eq!(parsed.info.digest_nonce.as_deref(), Some("n1"));
+        assert_eq!(parsed.info.page_title.as_deref(), Some("Intel AMT"));
+        assert!(parsed.info.server_header.as_deref().unwrap().contains("Intel"));
+    }
+}
+
 // ============================================================
 // Coordinator: one call per (host, port), with a hard host-level time
 // budget so a single slow/broken host can never stall the whole scan.

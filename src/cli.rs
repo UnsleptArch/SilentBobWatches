@@ -181,3 +181,52 @@ fn expand_dash_range(item: &str) -> Option<Vec<String>> {
     octets.clear();
     Some((start..=end).map(|o| format!("{prefix}.{o}")).collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expand_ports_parses_and_trims() {
+        assert_eq!(expand_ports("16992,16993,623").unwrap(), vec![16992, 16993, 623]);
+        assert_eq!(expand_ports(" 80 , 443 ").unwrap(), vec![80, 443]);
+    }
+
+    #[test]
+    fn expand_ports_rejects_empty_and_garbage() {
+        assert!(expand_ports("").is_err());
+        assert!(expand_ports("abc").is_err());
+        assert!(expand_ports("70000").is_err()); // out of u16 range
+    }
+
+    #[test]
+    fn expand_targets_single_and_list() {
+        assert_eq!(expand_targets("10.0.0.5").unwrap(), vec!["10.0.0.5"]);
+        assert_eq!(expand_targets("10.0.0.1,10.0.0.2").unwrap(), vec!["10.0.0.1", "10.0.0.2"]);
+    }
+
+    #[test]
+    fn expand_targets_skips_comments_and_blanks() {
+        assert_eq!(expand_targets("# a comment\n10.0.0.9\n\n").unwrap(), vec!["10.0.0.9"]);
+    }
+
+    #[test]
+    fn expand_targets_dash_range() {
+        assert_eq!(
+            expand_targets("10.0.0.10-12").unwrap(),
+            vec!["10.0.0.10", "10.0.0.11", "10.0.0.12"]
+        );
+    }
+
+    #[test]
+    fn expand_targets_cidr_yields_usable_hosts() {
+        // /30 has two usable host addresses (.1 and .2).
+        assert_eq!(expand_targets("10.0.0.0/30").unwrap(), vec!["10.0.0.1", "10.0.0.2"]);
+    }
+
+    #[test]
+    fn dash_range_rejects_bad_input() {
+        assert!(expand_dash_range("10.0.0.10-9").is_none()); // end < start
+        assert!(expand_dash_range("bad-range").is_none()); // not four octets
+    }
+}

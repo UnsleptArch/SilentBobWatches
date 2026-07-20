@@ -444,3 +444,95 @@ fn dechunk(body: &str) -> String {
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dechunk_reassembles_multiple_chunks() {
+        assert_eq!(dechunk("4\r\nWiki\r\n5\r\npedia\r\n0\r\n\r\n"), "Wikipedia");
+    }
+
+    #[test]
+    fn dechunk_stops_on_terminator_chunk() {
+        assert_eq!(dechunk("3\r\nabc\r\n0\r\n\r\n"), "abc");
+    }
+
+    #[test]
+    fn field_extracts_quoted_value() {
+        let h = r#"Digest realm="Digest:12345", nonce="abcXYZ", qop="auth""#;
+        assert_eq!(field(h, "realm").as_deref(), Some("Digest:12345"));
+        assert_eq!(field(h, "nonce").as_deref(), Some("abcXYZ"));
+        assert_eq!(field(h, "qop").as_deref(), Some("auth"));
+        assert!(field(h, "opaque").is_none());
+    }
+
+    #[test]
+    fn parse_challenge_requires_realm_and_nonce() {
+        let ch = parse_challenge(r#"Digest realm="R", nonce="N", qop="auth""#).unwrap();
+        assert_eq!(ch.realm, "R");
+        assert_eq!(ch.nonce, "N");
+        assert_eq!(ch.qop.as_deref(), Some("auth"));
+        assert!(parse_challenge(r#"Digest realm="R""#).is_none());
+    }
+
+    #[test]
+    fn amt_version_segments_accepts_plausible_builds() {
+        assert_eq!(amt_version_segments("11.8.55"), Some(3));
+        assert_eq!(amt_version_segments("11.8.55.1096"), Some(4));
+        assert_eq!(amt_version_segments("12.0"), Some(2));
+    }
+
+    #[test]
+    fn amt_version_segments_rejects_implausible() {
+        assert!(amt_version_segments("1.0").is_none()); // major below AMT range
+        assert!(amt_version_segments("2020.1.1").is_none()); // major above AMT range
+        assert!(amt_version_segments("11").is_none()); // too few segments
+        assert!(amt_version_segments("a.b.c").is_none()); // non-numeric
+    }
+
+    #[test]
+    fn pick_amt_version_prefers_the_amt_like_string() {
+        let soap = "<x><VersionString>1.0</VersionString></x>\
+                    <y><VersionString>11.8.50</VersionString></y>";
+        assert_eq!(pick_amt_version(soap).as_deref(), Some("11.8.50"));
+    }
+
+    #[test]
+    fn pick_amt_version_none_when_nothing_matches() {
+        assert!(pick_amt_version("<a><VersionString>1.0</VersionString></a>").is_none());
+    }
+
+    #[test]
+    fn parse_response_reads_status_and_challenge() {
+        let raw = b"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Digest realm=\"x\"\r\n\r\n";
+        let r = parse_response(raw);
+        assert_eq!(r.status, 401);
+        assert_eq!(r.www_authenticate.as_deref(), Some("Digest realm=\"x\""));
+    }
+
+    #[test]
+    fn parse_response_dechunks_body() {
+        let raw = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nWiki\r\n0\r\n\r\n";
+        let r = parse_response(raw);
+        assert_eq!(r.status, 200);
+        assert_eq!(r.body, "Wiki");
+    }
+
+    #[test]
+    fn bypass_digest_header_has_empty_response() {
+        let ch = DigestChallenge { realm: "Digest:1".into(), nonce: "abc".into(), qop: None, opaque: None };
+        let h = digest_header(&Auth::Bypass, &ch, "GET", "/index.htm");
+        assert!(h.contains(r#"username="admin""#));
+        assert!(h.contains(r#"response="""#), "bypass response hash must be empty: {h}");
+    }
+
+    #[test]
+    fn creds_digest_header_computes_a_response() {
+        let ch = DigestChallenge { realm: "Digest:1".into(), nonce: "abc".into(), qop: None, opaque: None };
+        let h = digest_header(&Auth::Creds("root".into(), "pw".into()), &ch, "GET", "/index.htm");
+        assert!(h.contains(r#"username="root""#));
+        assert!(!h.contains(r#"response="""#), "credentialed response must not be empty: {h}");
+    }
+}

@@ -18,6 +18,12 @@ what can and can't be known from the network alone.
 - Collects protocol evidence: HTTP status/headers/Digest realm/page title, full
   TLS certificate detail (subject, issuer, validity, SANs, cipher suite,
   self-signed heuristic), and ASF/RMCP OEM IANA enterprise data.
+- Answers the posture questions that actually matter regardless of patch level:
+  **is the AMT management plane reachable on this segment**, **is it provisioned
+  and operational** (a live management interface means AMT is provisioned, not
+  dormant), and **does it enforce authentication or answer unauthenticated**. The
+  exact control mode (Client Control Mode vs Admin Control Mode) is not exposed to
+  an unauthenticated caller, so its reported as an open item rather then guessed.
 - Reports presence, unauthenticated-exposure, TLS hygiene, and an honest
   "advisories that apply — authenticate to confirm" reference. Without an
   authenticated firmware build, version-gated advisories stay `Insufficient`; the
@@ -63,6 +69,13 @@ Requires a stable Rust toolchain (edition 2021).
 ```bash
 cargo build --release
 ./target/release/silentbobwatches --help
+```
+
+The pure logic (version-range comparison, the Digest/chunked/HTTP parsers, and
+target/port expansion) is covered by unit tests. Run them with:
+
+```bash
+cargo test
 ```
 
 Or use the included installer, which builds a release binary and installs it to
@@ -131,4 +144,5 @@ GPLv3 or later. See `LICENSE`.
 For assessing systems you own or are explicitly authorized to test. Active
 checks authenticate to a device — only point them at hosts you are authorized to
 assess. Scanning or authenticating without authorization may be illegal
-regardless of what the tool does; that responsibility sits with the operator.
+regardless of what the tool does; that responsibilty sits with the operator, not
+the tool.

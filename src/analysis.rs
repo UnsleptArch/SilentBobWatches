@@ -32,6 +32,7 @@ impl AnalysisEngine {
         if asset.amt_detected {
             asset.vendor = Some("Intel".to_string());
             self.presence_finding(asset);
+            self.provisioning_posture(asset);
             self.unauthenticated_exposure_check(asset);
             self.cve_reference(asset);
         }
@@ -167,6 +168,45 @@ impl AnalysisEngine {
             state: VulnState::Confirmed,
             evidence,
             remediation: "Confirm this asset is authorized to run remote management firmware and is reachable only from an isolated management network.".to_string(),
+        });
+    }
+
+    /// Answers the posture questions that matter regardless of patch level:
+    /// is the AMT management plane reachable on this segment at all, and is it
+    /// provisioned/operational? A live management interface means AMT is
+    /// provisioned rather than dormant. The exact control mode (Client Control
+    /// Mode vs Admin Control Mode) is not exposed to an unauthenticated caller,
+    /// so we record that as an open item instead of guessing it.
+    fn provisioning_posture(&self, asset: &mut AmtAsset) {
+        let enforcing_auth = matches!(asset.auth_state, AuthState::Digest | AuthState::AccessDenied);
+        let hint = if enforcing_auth {
+            "Provisioned / operational (management interface reachable and enforcing authentication); control mode not determinable without an authenticated read"
+        } else {
+            "Provisioned / operational (management interface reachable); no authentication challenge observed on first contact"
+        };
+        asset.provisioning_state_hint = Some(hint.to_string());
+
+        let mut evidence = vec![Evidence::new(
+            "Reachability",
+            format!("management plane answered on {}:{} ({})", asset.host, asset.port, asset.protocol.label()),
+            Confidence::High,
+        )];
+        if enforcing_auth {
+            evidence.push(Evidence::new("Auth state", asset.auth_state.label(), Confidence::High));
+        }
+
+        asset.findings.push(Finding {
+            title: "Intel AMT management plane reachable on this segment".to_string(),
+            description: format!(
+                "The AMT management interface at {}:{} is reachable and operational, which means AMT is provisioned rather than dormant on this host. Whether it runs in Client Control Mode or Admin Control Mode cannot be read without authentication, so that stays an open item. AMT should generally be reachable only from an isolated out-of-band management network; reachability from a general-purpose segment is itself worth reviewing.",
+                asset.host, asset.port
+            ),
+            severity: Severity::Medium,
+            cve: None,
+            advisory: None,
+            state: VulnState::Confirmed,
+            evidence,
+            remediation: "Confirm AMT is required on this host. If so, restrict the management ports (16992-16995, 623, 664) to an isolated management VLAN; if not, unprovision it. Read the control mode (CCM/ACM) with an authenticated WS-Man query to complete the posture picture.".to_string(),
         });
     }
 

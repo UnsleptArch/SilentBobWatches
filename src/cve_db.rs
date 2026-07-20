@@ -169,3 +169,68 @@ pub fn evaluate_2017_5689(hint: &str) -> VersionVerdict {
     }
     VersionVerdict::VulnerableRange
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_hint_splits_branch_and_build() {
+        let p = parse_firmware_hint("11.8.55").unwrap();
+        assert_eq!(p.branch, "11.8");
+        assert_eq!(p.build, 55);
+    }
+
+    #[test]
+    fn parse_hint_defaults_missing_build_to_zero() {
+        let p = parse_firmware_hint("12.0").unwrap();
+        assert_eq!(p.branch, "12.0");
+        assert_eq!(p.build, 0);
+    }
+
+    #[test]
+    fn parse_hint_rejects_too_few_segments_or_garbage() {
+        assert!(parse_firmware_hint("11").is_none());
+        assert!(parse_firmware_hint("x.y").is_none());
+        assert!(parse_firmware_hint("").is_none());
+    }
+
+    #[test]
+    fn generic_below_threshold_is_vulnerable() {
+        assert_eq!(evaluate_generic(&CVE_2020_0594_0595, "11.8.50"), VersionVerdict::VulnerableRange);
+        assert_eq!(evaluate_generic(&CVE_2020_0594_0595, "12.0.63"), VersionVerdict::VulnerableRange);
+    }
+
+    #[test]
+    fn generic_at_or_above_threshold_is_fixed() {
+        assert_eq!(evaluate_generic(&CVE_2020_0594_0595, "11.8.77"), VersionVerdict::Fixed);
+        assert_eq!(evaluate_generic(&CVE_2020_0594_0595, "11.8.200"), VersionVerdict::Fixed);
+        assert_eq!(evaluate_generic(&CVE_2020_0594_0595, "12.0.64"), VersionVerdict::Fixed);
+    }
+
+    #[test]
+    fn generic_unlisted_branch_is_not_applicable() {
+        assert_eq!(evaluate_generic(&CVE_2020_0594_0595, "13.0.1"), VersionVerdict::NotApplicable);
+        assert_eq!(evaluate_generic(&CVE_2020_0594_0595, "9.5.0"), VersionVerdict::NotApplicable);
+    }
+
+    #[test]
+    fn cve_2017_5689_leading_three_build_is_fixed() {
+        // 4-digit build starting with 3 is the patched marker (e.g. 8.1.71.3608).
+        assert_eq!(evaluate_2017_5689("8.1.71.3608"), VersionVerdict::Fixed);
+        assert_eq!(evaluate_2017_5689("6.2.61.3535"), VersionVerdict::Fixed);
+    }
+
+    #[test]
+    fn cve_2017_5689_non_three_build_in_scope_is_vulnerable() {
+        assert_eq!(evaluate_2017_5689("8.1.71.1096"), VersionVerdict::VulnerableRange);
+        assert_eq!(evaluate_2017_5689("11.6.0.1000"), VersionVerdict::VulnerableRange);
+    }
+
+    #[test]
+    fn cve_2017_5689_out_of_scope_branch_is_not_applicable() {
+        // 11.8 is not an affected branch for INTEL-SA-00075.
+        assert_eq!(evaluate_2017_5689("11.8.55"), VersionVerdict::NotApplicable);
+        assert_eq!(evaluate_2017_5689("garbage"), VersionVerdict::NotApplicable);
+    }
+}
